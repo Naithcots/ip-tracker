@@ -42,6 +42,7 @@ const App = () => {
           <div className="flex h-12 max-w-2xl grow">
             <input
               type="text"
+              placeholder="Search for any IP address or domain"
               className="w-full rounded-l-xl px-5 py-3 outline-none"
             />
             <button className="bg-veryDarkGray hover:bg-veryDarkGray/70 grid aspect-square h-full place-items-center rounded-r-xl transition-colors">
