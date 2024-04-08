@@ -1,10 +1,62 @@
+import { useQuery } from "@tanstack/react-query";
 import * as leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
+import { IpAddressInfo } from "./types";
+
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+const getCityByIp = async (ip: string): Promise<IpAddressInfo> => {
+  const response = await fetch(
+    `https://geo.ipify.org/api/v2/country,city?apiKey=${API_KEY}&ipAddress=${ip}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(response.statusText);
+  }
+
+  return response.json();
+};
 
 const App = () => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [map, setMap] = useState<leaflet.Map | null>(null);
+  const [ipInput, setIpInput] = useState("");
+
+  const { refetch, data, isFetching, error } = useQuery({
+    queryKey: ["ip", { value: ipInput }],
+    queryFn: () => getCityByIp(ipInput),
+    retry: false,
+    enabled: false,
+  });
+
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = (ev) => {
+    ev.preventDefault();
+    refetch();
+  };
+
+  useEffect(() => {
+    if (data) {
+      if (map) {
+        const icon = leaflet.icon({
+          iconUrl: "/images/icon-location.svg",
+          iconSize: [46, 56],
+        });
+
+        var locationRadius = leaflet
+          .marker([data.location.lat, data.location.lng], { icon })
+          .addTo(map);
+
+        map?.setView([data.location.lat, data.location.lng]);
+      }
+    }
+
+    return () => {
+      if (locationRadius) {
+        locationRadius.remove();
+      }
+    };
+  }, [data]);
 
   useEffect(() => {
     if (mapRef?.current && !map) {
@@ -30,58 +82,79 @@ const App = () => {
   }, [mapRef]);
 
   return (
-    <div className="grid h-dvh grid-rows-[auto_auto_auto_1fr]">
+    <div className="grid h-dvh grid-rows-[auto_10%_auto_1fr] sm:grid-rows-[auto_auto_auto_1fr]">
       <div className="col-[1/1] row-[1/3] bg-[url('/images/pattern-bg-mobile.png')] bg-cover bg-no-repeat md:bg-[url('/images/pattern-bg-desktop.png')]" />
-      <section className="col-[1/1] row-[1/1] mx-auto mb-8 w-full max-w-7xl px-6 md:mb-10">
-        <header className="py-6 text-center">
-          <h1 className="text-3xl font-medium text-white">
+      <section className="col-[1/1] row-[1/1] mx-auto mb-4 w-full max-w-7xl px-6 sm:mb-8 md:mb-10">
+        <header className="py-4 text-center sm:py-6">
+          <h1 className="text-2xl font-medium text-white sm:text-3xl">
             IP Address Tracker
           </h1>
         </header>
-        <section className="flex justify-center">
-          <div className="flex h-12 max-w-2xl grow">
-            <input
-              type="text"
-              placeholder="Search for any IP address or domain"
-              className="w-full rounded-l-xl px-5 py-3 outline-none"
-            />
-            <button className="bg-veryDarkGray hover:bg-veryDarkGray/70 grid aspect-square h-full place-items-center rounded-r-xl transition-colors">
-              <img src="/images/icon-arrow.svg" />
-            </button>
+        <form onSubmit={onSubmit}>
+          <section className="flex justify-center">
+            <div className="flex h-12 max-w-2xl grow">
+              <input
+                type="text"
+                placeholder="Search for any IP address or domain"
+                className="w-full rounded-l-xl px-5 py-3 outline-none"
+                value={ipInput}
+                onChange={(event) => setIpInput(event.target.value)}
+              />
+              <button
+                type="submit"
+                disabled={isFetching}
+                className="bg-veryDarkGray hover:bg-veryDarkGray/70 disabled:bg-veryDarkGray/50 grid aspect-square h-full place-items-center rounded-r-xl transition-colors"
+              >
+                <img src="/images/icon-arrow.svg" />
+              </button>
+            </div>
+          </section>
+        </form>
+        {error && (
+          <div className="mx-auto mt-4 w-fit rounded-lg bg-red-600 px-6 py-2 text-white">
+            <p className="text-center">
+              An error occurred. Please try again later.
+            </p>
           </div>
-        </section>
+        )}
       </section>
       <section className="col-[1/1] row-[2/4]">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="relative z-10 flex flex-col gap-4 rounded-xl bg-white p-7 shadow-sm md:flex-row md:justify-around md:py-9">
+          <div className="relative z-10 flex flex-col gap-2 rounded-xl bg-white p-5 shadow-sm sm:gap-4 sm:p-7 md:flex-row md:justify-around md:py-9">
             <div className="space-y-1 text-center md:text-left">
-              <p className="text-darkGray text-sm font-bold tracking-widest">
+              <p className="text-darkGray text-xs font-bold tracking-widest sm:text-sm">
                 IP ADDRESS
               </p>
-              <p className="text-xl font-medium sm:text-2xl">192.212.174.101</p>
+              <p className="text-lg font-medium sm:text-2xl">
+                {data ? data.ip : "-"}
+              </p>
             </div>
             <div className="bg-darkGray/40 w-[1px]" />
             <div className="space-y-1 text-center md:text-left">
-              <p className="text-darkGray text-sm font-bold tracking-widest">
+              <p className="text-darkGray text-xs font-bold tracking-widest sm:text-sm">
                 LOCATION
               </p>
-              <p className="text-xl font-medium sm:text-2xl">
-                Brooklyn, NY 10001
+              <p className="text-lg font-medium sm:text-2xl">
+                {data ? data.location.city : "-"}
               </p>
             </div>
             <div className="bg-darkGray/40 w-[1px]" />
             <div className="space-y-1 text-center md:text-left">
-              <p className="text-darkGray text-sm font-bold tracking-widest">
+              <p className="text-darkGray text-xs font-bold tracking-widest sm:text-sm">
                 TIMEZONE
               </p>
-              <p className="text-xl font-medium sm:text-2xl">UTC -05:00</p>
+              <p className="text-lg font-medium sm:text-2xl">
+                {data ? `UTC ${data.location.timezone}` : "-"}
+              </p>
             </div>
             <div className="bg-darkGray/40 w-[1px]" />
             <div className="space-y-1 text-center md:text-left">
-              <p className="text-darkGray text-sm font-bold tracking-widest">
+              <p className="text-darkGray text-xs font-bold tracking-widest sm:text-sm">
                 ISP
               </p>
-              <p className="text-xl font-medium sm:text-2xl">SpaceX Starlink</p>
+              <p className="text-lg font-medium sm:text-2xl">
+                {data ? data.isp : "-"}
+              </p>
             </div>
           </div>
         </div>
